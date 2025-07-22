@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中文撲克牌編碼器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #555;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 120px;
+            resize: vertical;
+            font-family: monospace;
+            line-height: 1.4;
+        }
+        .char-count {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .cards-display {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            word-break: break-all;
+        }
+        .message {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        .error {
+            background: #d32f2f;
+        }
+        .success {
+            background: #388e3c;
+        }
+        .info {
+            background: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>中文撲克牌編碼器</h1>
+        
+        <div class="section">
+            <h2>編碼：文字 → 撲克牌</h2>
+            <label for="textInput">輸入文字（最多13字符）：</label>
+            <input type="text" id="textInput" placeholder="請輸入要編碼的文字..." maxlength="13">
+            <div class="char-count" id="charCount">0 / 13 字符</div>
+            
+            <label style="margin-top: 15px;">撲克牌排列（T=10、s=黑桃、h=紅心、d=方塊、c=梅花）：</label>
+            <div class="cards-display" id="cardsOutput">等待輸入文字...</div>
+        </div>
+        
+        <div class="section">
+                    <h2>解碼：撲克牌 → 文字</h2>
+                    <label for="cardsInput">輸入撲克牌字串（52張牌，用空格分隔）：</label>
+                    <textarea id="cardsInput" placeholder="例如：As 2h Kd Jc 5s Tc Qh 8d..."></textarea>
+                    
+                    <label style="margin-top: 15px;">解碼結果：</label>
+                    <div class="cards-display" id="textOutput">等待輸入撲克牌...</div>
+                </div>
+            </div>
+    
+    <div class="message" id="messageBar">準備就緒</div>
+
+    <script>
+       
+        // 預先計算階乘值數組，用於排列編碼計算（使用 BigInt 避免數字溢出）
+        // factorials[n] = n! （n的階乘）
+        // 例如：factorials[5] = 5! = 5 × 4 × 3 × 2 × 1 = 120
+        let factorials = [1n];
+        for (let i = 1; i <= 60; i++) {
+            factorials[i] = BigInt(i) * factorials[i-1];
+        }
+
+        // 定義52張標準撲克牌，使用Unicode符號顯示
+        // 按照黑桃、紅心、方塊、梅花的順序排列
+        const cards = [
+            'A♠', '2♠', '3♠', '4♠', '5♠', '6♠', '7♠', '8♠', '9♠', '10♠', 'J♠', 'Q♠', 'K♠',
+            'A♥', '2♥', '3♥', '4♥', '5♥', '6♥', '7♥', '8♥', '9♥', '10♥', 'J♥', 'Q♥', 'K♥',
+            'A♦', '2♦', '3♦', '4♦', '5♦', '6♦', '7♦', '8♦', '9♦', '10♦', 'J♦', 'Q♦', 'K♦',
+            'A♣', '2♣', '3♣', '4♣', '5♣', '6♣', '7♣', '8♣', '9♣', '10♣', 'J♣', 'Q♣', 'K♣'
+        ];
+
+        // 定義52張撲克牌的文字表示法
+        // 使用標準撲克牌記號：s(黑桃)、h(紅心)、d(方塊)、c(梅花)
+        // T代表10，以避免與1混淆
+        const cardsText = [
+            'As', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', 'Ts', 'Js', 'Qs', 'Ks',
+            'Ah', '2h', '3h', '4h', '5h', '6h', '7h', '8h', '9h', 'Th', 'Jh', 'Qh', 'Kh',
+            'Ad', '2d', '3d', '4d', '5d', '6d', '7d', '8d', '9d', 'Td', 'Jd', 'Qd', 'Kd',
+            'Ac', '2c', '3c', '4c', '5c', '6c', '7c', '8c', '9c', 'Tc', 'Jc', 'Qc', 'Kc'
+        ];
+
+        /**
+         * 將一個數字轉換為階乘進位制表示法
+         * 階乘進位制是一種特殊的數字系統，第i位的基數是i!
+         * 例如：數字23在階乘進位制中表示為[3,2,1,1,0]
+         * 這個函數用於將數字映射到排列
+         * 
+         * @param {BigInt} number - 要轉換的數字
+         * @returns {Array} 階乘進位制數組
+         */
+        function convertToFactoradic(number) {
+            let result = [];
+            let divisor = 1n;
+            
+            // 持續除以遞增的除數，得到階乘進位制的各位數
+            while (number > 0n) {
+                let digit = Number(number % divisor);
+                result.unshift(digit); // 將數字插入到數組開頭
+                number = number / divisor;
+                divisor++;
+            }
+            
+            return result;
+        }
+
+        /**
+         * 將階乘進位制數組轉換回普通數字
+         * 這是convertToFactoradic函數的逆運算
+         * 
+         * @param {Array} factoradicArray - 階乘進位制數組
+         * @returns {BigInt} 轉換後的數字
+         */
+        function convertFromFactoradic(factoradicArray) {
+            let result = 0n;
+            let length = factoradicArray.length;
+            
+            // 將每個位數乘以對應的階乘值並加總
+            for (let i = 0; i < length; i++) {
+                let digit = BigInt(factoradicArray[i]);
+                let factorial = factorials[length - i - 1];
+                result += digit * factorial;
+            }
+            
+            return result;
+        }
+
+        /**
+         * 將數字轉換為指定大小的排列
+         * 使用Lehmer編碼將數字映射到排列
+         * 例如：數字2對應於[0,1,2]的排列[1,0,2]
+         * 
+         * @param {BigInt} number - 要轉換的數字
+         * @param {number} permutationSize - 排列的大小
+         * @returns {Array} 對應的排列數組
+         */
+        function convertToPermutation(number, permutationSize) {
+            // 檢查數字是否超出排列範圍
+            if (number >= factorials[permutationSize]) {
+                throw new Error(`數字 ${number} 超出了 ${permutationSize} 個元素的排列範圍`);
+            }
+            
+            // 先轉換為階乘進位制
+            let factoradic = convertToFactoradic(number);
+            
+            // 補齊到指定長度（前面補0）
+            while (factoradic.length < permutationSize) {
+                factoradic.unshift(0);
+            }
+            
+            // 建立可選元素列表（0到permutationSize-1）
+            let available = [];
+            for (let i = 0; i < permutationSize; i++) {
+                available.push(i);
+            }
+            
+            // 根據階乘進位制構建排列
+            let permutation = [];
+            for (let i = 0; i < factoradic.length; i++) {
+                let index = factoradic[i];
+                let element = available[index]; // 選擇第index個可用元素
+                permutation.push(element);
+                available.splice(index, 1); // 移除已選擇的元素
+            }
+            
+            return permutation;
+        }
+
+        /**
+         * 將排列轉換回數字
+         * 這是convertToPermutation函數的逆運算
+         * 使用Lehmer解碼將排列轉換為數字
+         * 
+         * @param {Array} permutation - 排列數組
+         * @returns {BigInt} 對應的數字
+         */
+        function convertFromPermutation(permutation) {
+            let permSize = permutation.length;
+            let factoradic = [];
+            
+            // 建立數字序列（0到permSize-1）
+            let numbers = [];
+            for (let i = 0; i < permSize; i++) {
+                numbers.push(i);
+            }
+            
+            // 對於排列中的每個元素，找出它在剩餘數字中的位置
+            for (let i = 0; i < permutation.length; i++) {
+                let element = permutation[i];
+                let index = numbers.indexOf(element); // 找到元素在剩餘數字中的索引
+                factoradic.push(index);
+                numbers.splice(index, 1); // 移除該元素
+            }
+            
+            // 將階乘進位制轉換回數字
+            return convertFromFactoradic(factoradic);
+        }
+
+        /**
+         * 將文字轉換為撲克牌排列
+         * 這是整個編碼系統的核心函數
+         * 步驟：文字 → 數字編碼 → 排列 → 撲克牌順序
+         * 
+         * @param {string} text - 要編碼的文字
+         * @returns {Array} 對應的撲克牌索引排列
+         */
+        function textToCards(text) {
+            // 計算最大可編碼的字符數（每個字符16位，總共224位）
+            const maxChars = Math.floor(224 / 16);
+            
+            // 檢查文字長度是否超出限制（需要保留1個字符位置存儲長度信息）
+            if (text.length > maxChars - 1) {
+                throw new Error(`文字長度不能超過 ${maxChars - 1} 個字符`);
+            }
+            
+            // 先將文字長度編碼到數字中
+            let bigNumber = BigInt(text.length);
+            
+            // 將每個字符的Unicode編碼拼接到數字中（每個字符佔16位）
+            for (let i = 0; i < text.length; i++) {
+                let charCode = text.charCodeAt(i);
+                bigNumber = bigNumber * (2n ** 16n) + BigInt(charCode);
+            }
+            
+            // 在末尾補零，確保總長度固定
+            let remainingBits = (maxChars - 1 - text.length) * 16;
+            bigNumber = bigNumber * (2n ** BigInt(remainingBits));
+            
+            // 將數字轉換為52張牌的排列
+            return convertToPermutation(bigNumber, 52);
+        }
+
+        /**
+         * 將撲克牌排列轉換回文字
+         * 這是textToCards函數的逆運算
+         * 步驟：撲克牌順序 → 排列 → 數字解碼 → 文字
+         * 
+         * @param {Array} cardOrder - 撲克牌索引排列
+         * @returns {string} 解碼出的文字
+         */
+        function cardsToText(cardOrder) {
+            // 驗證輸入的撲克牌排列
+            if (cardOrder.length !== 52) {
+                throw new Error("撲克牌排列必須包含52張牌");
+            }
+            
+            // 檢查是否包含所有不同的牌（0-51）
+            let checkSet = new Set(cardOrder);
+            if (checkSet.size !== 52) {
+                throw new Error("撲克牌排列必須包含0-51的所有不同數字");
+            }
+            
+            // 將排列轉換回數字
+            let bigNumber = convertFromPermutation(cardOrder);
+            
+            // 計算參數
+            let maxChars = Math.floor(224 / 16) - 1;
+            let lengthBits = maxChars * 16;
+            
+            // 從高位提取文字長度信息
+            let textLength = Number(bigNumber >> BigInt(lengthBits));
+            
+            // 提取內容部分（去掉長度信息）
+            let contentMask = (2n ** BigInt(lengthBits)) - 1n;
+            bigNumber = bigNumber & contentMask;
+            
+            let result = "";
+            
+            // 移除末尾的填充零
+            let paddingBits = (maxChars - textLength) * 16;
+            bigNumber = bigNumber >> BigInt(paddingBits);
+            
+            // 逐個字符解碼（從低位開始）
+            for (let i = 0; i < textLength; i++) {
+                let charCode = Number(bigNumber % (2n ** 16n)); // 取低16位
+                result = String.fromCharCode(charCode) + result; // 插入到字串開頭
+                bigNumber = bigNumber >> 16n; // 右移16位，處理下一個字符
+            }
+            
+            return result;
+        }
+
+        /**
+         * 將撲克牌字串轉換為索引數組
+         * 解析用戶輸入的撲克牌文字表示法，轉換為內部使用的索引
+         * 例如："As 2h Kd" → [0, 14, 51]
+         * 
+         * @param {string} cardString - 撲克牌字串（空格分隔）
+         * @returns {Array} 對應的索引數組
+         */
+        function cardStringToIndices(cardString) {
+            // 按空格分割撲克牌字串
+            let cardNames = cardString.trim().split(/\s+/);
+            
+            // 檢查是否有52張牌
+            if (cardNames.length !== 52) {
+                throw new Error(`撲克牌字串必須包含52張牌，但只找到 ${cardNames.length} 張`);
+            }
+            
+            let indices = [];
+            
+            // 逐個解析每張撲克牌
+            for (let cardName of cardNames) {
+                cardName = cardName.trim();
+                if (cardName.length < 2) {
+                    throw new Error(`無效的撲克牌格式: "${cardName}"`);
+                }
+                
+                // 提取花色（最後一個字符）
+                let suit = cardName.slice(-1).toLowerCase();
+                // 提取點數（除了最後一個字符）
+                let rank = cardName.slice(0, -1);
+                
+                // 標準化點數表示法
+                if (rank.toLowerCase() === 'a') rank = 'A';
+                else if (rank.toLowerCase() === 't' || rank === '10') rank = 'T';
+                else if (rank.toLowerCase() === 'j') rank = 'J';
+                else if (rank.toLowerCase() === 'q') rank = 'Q';
+                else if (rank.toLowerCase() === 'k') rank = 'K';
+                
+                // 組合成標準格式
+                let standardCard = rank + suit;
+                
+                // 在cardsText數組中查找對應的索引
+                let index = cardsText.indexOf(standardCard);
+                
+                if (index === -1) {
+                    throw new Error(`無法識別的撲克牌: "${cardName}"`);
+                }
+                
+                indices.push(index);
+            }
+            
+            // 驗證沒有重複的牌
+            let uniqueIndices = new Set(indices);
+            if (uniqueIndices.size !== 52) {
+                throw new Error("撲克牌字串包含重複的牌");
+            }
+            
+            // 驗證包含了所有的牌
+            for (let i = 0; i < 52; i++) {
+                if (!uniqueIndices.has(i)) {
+                    throw new Error(`缺少撲克牌: ${cardsText[i]}`);
+                }
+            }
+            
+            return indices;
+        }
+
+        /**
+         * 將索引數組轉換為撲克牌字串
+         * 這是cardStringToIndices函數的逆運算
+         * 例如：[0, 14, 51] → "As Ah Kc"
+         * 
+         * @param {Array} indices - 索引數組
+         * @returns {string} 對應的撲克牌字串（空格分隔）
+         */
+        function indicesToCardString(indices) {
+            if (indices.length !== 52) {
+                throw new Error("索引數組必須包含52個元素");
+            }
+            
+            // 將每個索引轉換為對應的撲克牌文字，並用空格連接
+            return indices.map(index => cardsText[index]).join(' ');
+        }
+
+        /**
+         * 直接從撲克牌字串解碼出文字
+         * 整合了cardStringToIndices和cardsToText兩個函數的功能
+         * 
+         * @param {string} cardString - 撲克牌字串
+         * @returns {string} 解碼出的文字
+         */
+        function cardStringToText(cardString) {
+            // 先將撲克牌字串轉換為索引數組
+            let indices = cardStringToIndices(cardString);
+            // 再將索引數組轉換為文字
+            return cardsToText(indices);
+        }
+
+        /**
+         * 將撲克牌索引數組轉換為顯示格式
+         * 可以選擇使用Unicode符號或文字表示法
+         * 
+         * @param {Array} cardOrder - 撲克牌索引數組
+         * @param {boolean} useTextFormat - 是否使用文字格式（預設為false，使用Unicode符號）
+         * @returns {Array} 格式化後的撲克牌數組
+         */
+        function displayCards(cardOrder, useTextFormat = false) {
+            if (useTextFormat) {
+                return cardOrder.map(index => cardsText[index]);
+            } else {
+                return cardOrder.map(index => cards[index]);
+            }
+        }
+
+
+        // ============ 以下是用戶界面相關的功能函數 ============
+
+        /**
+         * 在頁面底部顯示訊息
+         * 用於向用戶反饋操作結果或錯誤信息
+         * 
+         * @param {string} message - 要顯示的訊息內容
+         * @param {string} type - 訊息類型：'info'（藍色）、'success'（綠色）、'error'（紅色）
+         */
+        function showMessage(message, type = 'info') {
+            const messageBar = document.getElementById('messageBar');
+            messageBar.textContent = message;
+            messageBar.className = `message ${type}`;
+        }
+
+        /**
+         * 格式化撲克牌字串以便於顯示
+         * 將撲克牌按每行13張的方式排列，對應一個花色
+         * 
+         * @param {string} cardString - 空格分隔的撲克牌字串
+         * @returns {string} 格式化後的多行字串
+         */
+        function formatCardsForDisplay(cardString) {
+            const cards = cardString.split(' ');
+            let result = '';
+            for (let i = 0; i < cards.length; i++) {
+                result += cards[i];
+                // 每13張牌換行（對應一個花色）
+                if ((i + 1) % 13 === 0) {
+                    result += '\n';
+                } else {
+                    result += ' ';
+                }
+            }
+            return result.trim();
+        }
+
+        // ============ 事件監聽器設定 ============
+
+        // 編碼功能：監聽文字輸入框的變化
+        document.getElementById('textInput').addEventListener('input', function() {
+            const text = this.value;
+            const charCountEl = document.getElementById('charCount');
+            const cardsOutputEl = document.getElementById('cardsOutput');
+            
+            // 更新字符計數顯示
+            charCountEl.textContent = `${text.length} / 13 字符`;
+            
+            // 如果沒有輸入文字，顯示等待訊息
+            if (text.length === 0) {
+                cardsOutputEl.textContent = '等待輸入文字...';
+                showMessage('準備就緒');
+                return;
+            }
+            
+            try {
+                // 將文字編碼為撲克牌排列
+                const cardOrder = textToCards(text);
+                // 轉換為字串格式
+                const cardString = indicesToCardString(cardOrder);
+                // 格式化顯示
+                cardsOutputEl.textContent = formatCardsForDisplay(cardString);
+                showMessage(`成功編碼 "${text}" (${text.length} 字符)`, 'success');
+            } catch (error) {
+                // 處理編碼錯誤
+                cardsOutputEl.textContent = '編碼失敗';
+                showMessage(`編碼錯誤: ${error.message}`, 'error');
+            }
+        });
+
+        // 解碼功能：監聽撲克牌輸入框的變化
+        document.getElementById('cardsInput').addEventListener('input', function() {
+            const cardString = this.value.trim();
+            const textOutputEl = document.getElementById('textOutput');
+            
+            // 如果沒有輸入撲克牌，顯示等待訊息
+            if (cardString.length === 0) {
+                textOutputEl.textContent = '等待輸入撲克牌...';
+                showMessage('準備就緒');
+                return;
+            }
+            
+            try {
+                // 將撲克牌字串解碼為文字
+                const decodedText = cardStringToText(cardString);
+                // 顯示解碼結果（如果是空字串則顯示特殊標記）
+                textOutputEl.textContent = decodedText || '(空字串)';
+                showMessage(`成功解碼: "${decodedText}" (${decodedText.length} 字符)`, 'success');
+            } catch (error) {
+                // 處理解碼錯誤
+                textOutputEl.textContent = '解碼失敗';
+                showMessage(`解碼錯誤: ${error.message}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
