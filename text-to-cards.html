@@ -92,9 +92,9 @@
         
         <div class="section">
             <h2>編碼：文字 → 撲克牌</h2>
-            <label for="textInput">輸入文字（最多14字符）：</label>
+            <label for="textInput">輸入文字（最多14字元）：</label>
             <input type="text" id="textInput" placeholder="請輸入要編碼的文字..." maxlength="14">
-            <div class="char-count" id="charCount">0 / 14 字符</div>
+            <div class="char-count" id="charCount">0 / 14 字元</div>
             
             <label style="margin-top: 15px;">撲克牌排列（T=10、s=黑桃、h=紅心、d=方塊、c=梅花）：</label>
             <div class="cards-display" id="cardsOutput">等待輸入文字...</div>
@@ -259,8 +259,8 @@
 
         /**
          * 將文字轉換為撲克牌排列
-         * 新版本：直接編碼14個字符，不足的用null字符填充
-         * 步驟：文字 → 填充到14字符 → 數字編碼 → 排列 → 撲克牌順序
+         * 新版本：直接編碼14個字元，不足的用null字元填充
+         * 步驟：文字 → 填充到14字元 → 數字編碼 → 排列 → 撲克牌順序
          * 
          * @param {string} text - 要編碼的文字
          * @returns {Array} 對應的撲克牌索引排列
@@ -268,16 +268,16 @@
         function textToCards(text) {
             // 檢查文字長度是否超出限制
             if (text.length > 14) {
-                throw new Error('文字長度不能超過 14 個字符');
+                throw new Error('文字長度不能超過 14 個字元');
             }
             
-            // 將文字填充到14個字符，不足的用null字符(\u0000)填充
+            // 將文字填充到14個字元，不足的用null字元(\u0000)填充
             let paddedText = text.padEnd(14, '\u0000');
             
             // 將填充後的文字轉換為一個大數字
             let bigNumber = 0n;
             
-            // 將每個字符的Unicode編碼拼接到數字中（每個字符佔16位）
+            // 將每個字元的Unicode編碼拼接到數字中（每個字元佔16位）
             for (let i = 0; i < 14; i++) {
                 let charCode = paddedText.charCodeAt(i);
                 bigNumber = bigNumber * (2n ** 16n) + BigInt(charCode);
@@ -289,8 +289,8 @@
 
         /**
          * 將撲克牌排列轉換回文字
-         * 新版本：解碼14個字符，遇到第一個null字符就停止
-         * 步驟：撲克牌順序 → 排列 → 數字解碼 → 14字符字串 → 去除null填充
+         * 新版本：解碼14個字元，遇到第一個null字元就停止
+         * 步驟：撲克牌順序 → 排列 → 數字解碼 → 14字元字串 → 去除null填充
          * 
          * @param {Array} cardOrder - 撲克牌索引排列
          * @returns {string} 解碼出的文字
@@ -310,23 +310,23 @@
             // 將排列轉換回數字
             let bigNumber = convertFromPermutation(cardOrder);
             
-            // 逐個字符解碼（從低位開始，總共14個字符）
+            // 逐個字元解碼（從低位開始，總共14個字元）
             let chars = [];
             for (let i = 0; i < 14; i++) {
                 let charCode = Number(bigNumber % (2n ** 16n)); // 取低16位
                 chars.unshift(String.fromCharCode(charCode)); // 插入到數組開頭
-                bigNumber = bigNumber >> 16n; // 右移16位，處理下一個字符
+                bigNumber = bigNumber >> 16n; // 右移16位，處理下一個字元
             }
             
-            // 將字符數組合併成字串
+            // 將字元數組合併成字串
             let fullText = chars.join('');
             
-            // 找到第一個null字符的位置，如果沒有則返回完整字串
+            // 找到第一個null字元的位置，如果沒有則返回完整字串
             let nullIndex = fullText.indexOf('\u0000');
             if (nullIndex === -1) {
-                return fullText; // 沒有null字符，返回完整的14字符
+                return fullText; // 沒有null字元，返回完整的14字元
             } else {
-                return fullText.substring(0, nullIndex); // 在第一個null字符處截斷
+                return fullText.substring(0, nullIndex); // 在第一個null字元處截斷
             }
         }
 
@@ -356,9 +356,9 @@
                     throw new Error(`無效的撲克牌格式: "${cardName}"`);
                 }
                 
-                // 提取花色（最後一個字符）
+                // 提取花色（最後一個字元）
                 let suit = cardName.slice(-1).toLowerCase();
-                // 提取點數（除了最後一個字符）
+                // 提取點數（除了最後一個字元）
                 let rank = cardName.slice(0, -1);
                 
                 // 標準化點數表示法
@@ -490,8 +490,8 @@
             const charCountEl = document.getElementById('charCount');
             const cardsOutputEl = document.getElementById('cardsOutput');
             
-            // 更新字符計數顯示
-            charCountEl.textContent = `${text.length} / 14 字符`;
+            // 更新字元計數顯示
+            charCountEl.textContent = `${text.length} / 14 字元`;
             
             // 如果沒有輸入文字，顯示等待訊息
             if (text.length === 0) {
@@ -507,7 +507,7 @@
                 const cardString = indicesToCardString(cardOrder);
                 // 格式化顯示
                 cardsOutputEl.textContent = formatCardsForDisplay(cardString);
-                showMessage(`成功編碼 "${text}" (${text.length} 字符)`, 'success');
+                showMessage(`成功編碼 "${text}" (${text.length} 字元)`, 'success');
             } catch (error) {
                 // 處理編碼錯誤
                 cardsOutputEl.textContent = '編碼失敗';
@@ -532,7 +532,7 @@
                 const decodedText = cardStringToText(cardString);
                 // 顯示解碼結果（如果是空字串則顯示特殊標記）
                 textOutputEl.textContent = decodedText || '(空字串)';
-                showMessage(`成功解碼: "${decodedText}" (${decodedText.length} 字符)`, 'success');
+                showMessage(`成功解碼: "${decodedText}" (${decodedText.length} 字元)`, 'success');
             } catch (error) {
                 // 處理解碼錯誤
                 textOutputEl.textContent = '解碼失敗';
