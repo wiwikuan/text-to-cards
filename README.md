@@ -9,4 +9,4 @@
 
 透過這個程式，你可以把祕密訊息藏在一副撲克牌裡面了！
 
-到這裡玩：https://wiwi.blog/blog/text-to-cards
+到這裡直接用：https://wiwi.blog/blog/text-to-cards
