@@ -92,9 +92,9 @@
         
         <div class="section">
             <h2>編碼：文字 → 撲克牌</h2>
-            <label for="textInput">輸入文字（最多13字符）：</label>
-            <input type="text" id="textInput" placeholder="請輸入要編碼的文字..." maxlength="13">
-            <div class="char-count" id="charCount">0 / 13 字符</div>
+            <label for="textInput">輸入文字（最多14字符）：</label>
+            <input type="text" id="textInput" placeholder="請輸入要編碼的文字..." maxlength="14">
+            <div class="char-count" id="charCount">0 / 14 字符</div>
             
             <label style="margin-top: 15px;">撲克牌排列（T=10、s=黑桃、h=紅心、d=方塊、c=梅花）：</label>
             <div class="cards-display" id="cardsOutput">等待輸入文字...</div>
@@ -259,33 +259,29 @@
 
         /**
          * 將文字轉換為撲克牌排列
-         * 這是整個編碼系統的核心函數
-         * 步驟：文字 → 數字編碼 → 排列 → 撲克牌順序
+         * 新版本：直接編碼14個字符，不足的用null字符填充
+         * 步驟：文字 → 填充到14字符 → 數字編碼 → 排列 → 撲克牌順序
          * 
          * @param {string} text - 要編碼的文字
          * @returns {Array} 對應的撲克牌索引排列
          */
         function textToCards(text) {
-            // 計算最大可編碼的字符數（每個字符16位，總共224位）
-            const maxChars = Math.floor(224 / 16);
-            
-            // 檢查文字長度是否超出限制（需要保留1個字符位置存儲長度信息）
-            if (text.length > maxChars - 1) {
-                throw new Error(`文字長度不能超過 ${maxChars - 1} 個字符`);
+            // 檢查文字長度是否超出限制
+            if (text.length > 14) {
+                throw new Error('文字長度不能超過 14 個字符');
             }
             
-            // 先將文字長度編碼到數字中
-            let bigNumber = BigInt(text.length);
+            // 將文字填充到14個字符，不足的用null字符(\u0000)填充
+            let paddedText = text.padEnd(14, '\u0000');
+            
+            // 將填充後的文字轉換為一個大數字
+            let bigNumber = 0n;
             
             // 將每個字符的Unicode編碼拼接到數字中（每個字符佔16位）
-            for (let i = 0; i < text.length; i++) {
-                let charCode = text.charCodeAt(i);
+            for (let i = 0; i < 14; i++) {
+                let charCode = paddedText.charCodeAt(i);
                 bigNumber = bigNumber * (2n ** 16n) + BigInt(charCode);
             }
-            
-            // 在末尾補零，確保總長度固定
-            let remainingBits = (maxChars - 1 - text.length) * 16;
-            bigNumber = bigNumber * (2n ** BigInt(remainingBits));
             
             // 將數字轉換為52張牌的排列
             return convertToPermutation(bigNumber, 52);
@@ -293,8 +289,8 @@
 
         /**
          * 將撲克牌排列轉換回文字
-         * 這是textToCards函數的逆運算
-         * 步驟：撲克牌順序 → 排列 → 數字解碼 → 文字
+         * 新版本：解碼14個字符，遇到第一個null字符就停止
+         * 步驟：撲克牌順序 → 排列 → 數字解碼 → 14字符字串 → 去除null填充
          * 
          * @param {Array} cardOrder - 撲克牌索引排列
          * @returns {string} 解碼出的文字
@@ -314,31 +310,24 @@
             // 將排列轉換回數字
             let bigNumber = convertFromPermutation(cardOrder);
             
-            // 計算參數
-            let maxChars = Math.floor(224 / 16) - 1;
-            let lengthBits = maxChars * 16;
-            
-            // 從高位提取文字長度信息
-            let textLength = Number(bigNumber >> BigInt(lengthBits));
-            
-            // 提取內容部分（去掉長度信息）
-            let contentMask = (2n ** BigInt(lengthBits)) - 1n;
-            bigNumber = bigNumber & contentMask;
-            
-            let result = "";
-            
-            // 移除末尾的填充零
-            let paddingBits = (maxChars - textLength) * 16;
-            bigNumber = bigNumber >> BigInt(paddingBits);
-            
-            // 逐個字符解碼（從低位開始）
-            for (let i = 0; i < textLength; i++) {
+            // 逐個字符解碼（從低位開始，總共14個字符）
+            let chars = [];
+            for (let i = 0; i < 14; i++) {
                 let charCode = Number(bigNumber % (2n ** 16n)); // 取低16位
-                result = String.fromCharCode(charCode) + result; // 插入到字串開頭
+                chars.unshift(String.fromCharCode(charCode)); // 插入到數組開頭
                 bigNumber = bigNumber >> 16n; // 右移16位，處理下一個字符
             }
             
-            return result;
+            // 將字符數組合併成字串
+            let fullText = chars.join('');
+            
+            // 找到第一個null字符的位置，如果沒有則返回完整字串
+            let nullIndex = fullText.indexOf('\u0000');
+            if (nullIndex === -1) {
+                return fullText; // 沒有null字符，返回完整的14字符
+            } else {
+                return fullText.substring(0, nullIndex); // 在第一個null字符處截斷
+            }
         }
 
         /**
@@ -502,7 +491,7 @@
             const cardsOutputEl = document.getElementById('cardsOutput');
             
             // 更新字符計數顯示
-            charCountEl.textContent = `${text.length} / 13 字符`;
+            charCountEl.textContent = `${text.length} / 14 字符`;
             
             // 如果沒有輸入文字，顯示等待訊息
             if (text.length === 0) {
