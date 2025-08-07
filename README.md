@@ -1,4 +1,4 @@
-# text-to-card
+# text-to-cards
 
 靈感來自 [DeckCrypt](https://github.com/ashfn/deckcrypt)，它可以把一串文字用 52 張撲克牌排列的方式編碼，也可以解碼。但 DeckCrypt 只能處理英文字（連數字都不行），所以我重做了 UTF-16 的版本，應該支援大部分的中文字和表情符號。
 
